@@ -1,31 +1,43 @@
 // client/src/pages/Dashboard.jsx
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usersAPI, swapRequestsAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 
 const Dashboard = () => {
+  console.log('Dashboard component rendered');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState({ skillsOffered: '', skillsWanted: '' });
   const [sendingRequest, setSendingRequest] = useState(null);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) { // Only fetch users if user data is available
-      fetchUsers();
-    }
-  }, [user]); // Add user as dependency
+    // Always try to fetch users after login
+    fetchUsers();
+  }, [user]);
 
   const fetchUsers = async () => {
+    console.log('fetchUsers called, user:', user);
     try {
       const response = await usersAPI.getUsers();
+      console.log('API /users response:', response);
       // Add null check for user
       const otherUsers = response.data.data.users.filter(u => 
         user && u._id !== user._id // Check if user exists before accessing ._id
       );
+      console.log('Filtered otherUsers:', otherUsers);
       setUsers(otherUsers);
     } catch (err) {
+      console.error('Failed to load users:', err);
+      // If error is invalid token, log out and redirect
+      if (err.response?.data?.message?.toLowerCase().includes('token')) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+        return;
+      }
       setError('Failed to load users: ' + (err.response?.data?.message || err.message));
     } finally {
       setLoading(false);
@@ -60,14 +72,16 @@ const Dashboard = () => {
     return matchesOffered && matchesWanted;
   });
 
-  // Show loading until user data is available
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (user === null) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
+
   if (!user) {
-    return (
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading user data...</p>
-      </div>
-    );
+    return null; // Prevent rendering anything while redirecting
   }
 
   if (loading) return (

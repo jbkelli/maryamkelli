@@ -12,6 +12,9 @@ const protect = async (req, res, next) => {
       // Format: "Bearer <actual_token>"
       token = req.headers.authorization.split(' ')[1];
     }
+    // Debug logs
+    console.log('Protect middleware: received token:', token);
+    console.log('Protect middleware: JWT_SECRET:', process.env.JWT_SECRET);
 
     // 2) Check if token exists
     if (!token) {
@@ -22,26 +25,35 @@ const protect = async (req, res, next) => {
     }
 
     // 3) Verify the token
-    // jwt.verify is callback-based. promisify converts it to a promise-based function.
-    const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+    try {
+      const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+      console.log('Protect middleware: decoded token:', decoded);
 
-    // 4) Check if the user still exists (a token might be valid but user was deleted)
-    const currentUser = await User.findById(decoded.id);
-    if (!currentUser) {
+      // 4) Check if the user still exists (a token might be valid but user was deleted)
+      const currentUser = await User.findById(decoded.id);
+      if (!currentUser) {
+        return res.status(401).json({
+          status: 'fail',
+          message: 'The user belonging to this token does no longer exist.'
+        });
+      }
+
+      // 5) Grant access to the protected route
+      req.user = currentUser;
+      next();
+    } catch (verifyErr) {
+      console.error('Protect middleware: JWT verification error:', verifyErr);
       return res.status(401).json({
         status: 'fail',
-        message: 'The user belonging to this token does no longer exist.'
+        message: verifyErr.message || 'Invalid token.'
       });
     }
-
-    // 5) Grant access to the protected route
-    // Attach the user data to the request object.
-    // This will be available in the next middleware/controller function.
-    req.user = currentUser;
-    next(); // Call the next middleware/controller
-
   } catch (err) {
-    res.status(401).json({ status: 'fail', message: 'Invalid token.' });
+    console.error('Protect middleware: General error:', err);
+    return res.status(401).json({
+      status: 'fail',
+      message: err.message || 'Invalid token.'
+    });
   }
 };
 

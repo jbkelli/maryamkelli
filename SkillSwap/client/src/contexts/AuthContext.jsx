@@ -40,27 +40,35 @@ useEffect(() => {
   checkAuth();
 }, []);
 
-  const login = async (email, password) => {
-    try {
-      const response = await authAPI.login(email, password);
-      localStorage.setItem('token', response.token);
-      setUser(response.data.user);
-      return { success: true };
-    } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Login failed' };
-    }
-  };
 
-  const signup = async (userData) => {
-    try {
-      const response = await authAPI.signup(userData);
-      localStorage.setItem('token', response.token);
-      setUser(response.data.user);
-      return { success: true };
-    } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Signup failed' };
-    }
-  };
+    const login = async (email, password) => {
+      try {
+        const response = await authAPI.login(email, password);
+        // The backend returns the token as response.data.token
+        localStorage.setItem('token', response.data.token);
+        console.log('Login response:', response);
+        // Try to set user from response.data.user or response.data.data.user
+        const userData = response.data.user || (response.data.data && response.data.data.user);
+        setUser(userData);
+        console.log('User set after login:', userData);
+        return { success: true };
+      } catch (error) {
+        console.error('Login error:', error);
+        return { success: false, message: error.response?.data?.message || 'Login failed' };
+      }
+    };
+
+    const signup = async (userData) => {
+      try {
+        const response = await authAPI.signup(userData);
+        // The backend returns the token as response.data.token
+        localStorage.setItem('token', response.data.token);
+        setUser(response.data.user || (response.data.data && response.data.data.user));
+        return { success: true };
+      } catch (error) {
+        return { success: false, message: error.response?.data?.message || 'Signup failed' };
+      }
+    };
 
   const logout = () => {
     localStorage.removeItem('token');
